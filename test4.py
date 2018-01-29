@@ -1,50 +1,81 @@
+import time
 from multiprocessing import Process, JoinableQueue, Queue
+from random import random
 
+
+
+def double(n):
+    return n * 2
+
+
+# def producer(in_queue):
+#     while 1:
+#         wt = random()
+#         time.sleep(wt)
+#         in_queue.put((double, wt))
+#         print('put {}'.format(wt))
+#         if wt > 0.9:
+#             in_queue.put(None)
+#             print('stop producer')
+#             break
 
 class Producer(Process):
-    def __init__(self, in_q):
+    def __init__(self,in_queue):
         super().__init__()
-        self.in_q = in_q
+        self.in_queue = in_queue
 
     def run(self):
-        for i in range(10):
-            self.in_q.put(i)
-        print('生产完成')
-        self.in_q.put(None)
-
-
-class Consumer(Process):
-    def __init__(self, in_q, out_q):
-        super().__init__()
-        self.in_q = in_q
-        self.out_q = out_q
-
-    def run(self):
-        while True:
-            item = self.in_q.get()
-            if item is not None:
-                item = item * 2
-                self.in_q.task_done()
-                self.out_q.put(item)
-            else:
-                print('消费完成')
+        while 1:
+            wt = random()
+            time.sleep(wt)
+            self.in_queue.put((double, wt))
+            print('put {}'.format(wt))
+            if wt > 0.9:
+                self.in_queue.put(None)
+                print('stop producer')
                 break
 
+# def consumer(in_queue, out_queue):
+#     while True:
+#         task = in_queue.get()
+#         if task is None:
+#             break
+#         print('get {}'.format(task[1]))
+#         func, arg = task
+#         result = func(arg)
+#         out_queue.put(result)
 
-in_q = JoinableQueue()
-out_q = Queue()
+class Consumer(Process):
+    def __init__(self,in_queue,out_queue):
+        super().__init__()
+        self.in_queue = in_queue
+        self.out_queue = out_queue
+        
+    def run(self):
+        while True:
+            task = self.in_queue.get()
+            if task is None:
+                break
+            print('get {}'.format(task[1]))
+            func, arg = task
+            result = func(arg)
+            self.out_queue.put(result)
 
-p = Producer(in_q)
-c = Consumer(in_q, out_q)
-p.daemon = True
-c.daemon = True
+tasks_queue = JoinableQueue()
+results_queue = Queue()
+processes = []
+p = Producer(tasks_queue)
 p.start()
-in_q.join()
+processes.append(p)
+c = Consumer(tasks_queue, results_queue)
 c.start()
-print('main process end')
+processes.append(c)
 
-while 1:
-    if out_q.empty():
+
+for p in processes:
+    p.join()
+while True:
+    if results_queue.empty():
         break
-    result = out_q.get()
-    print('Result:', result)
+    r = results_queue.get()
+    print('Result:', r)
